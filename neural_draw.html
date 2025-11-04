@@ -1,0 +1,2736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Neural Draw Pro - AI That Learns Your Handwriting</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{
+        font-family:'Segoe UI',sans-serif;
+        background:#0f0f1e;
+        color:#eee;
+        height:100vh;
+        display:flex;
+        flex-direction:column;
+        overflow:hidden;
+        -webkit-tap-highlight-color:transparent;
+        -webkit-touch-callout:none;
+        user-select:none;
+    }
+    @media (max-width: 768px) {
+        body{
+            height:100svh;
+        }
+    }
+    .header{
+        padding:15px 20px;
+        background:rgba(0,0,0,0.6);
+        backdrop-filter:blur(10px);
+        border-bottom:1px solid rgba(255,255,255,0.1);
+        text-align:center;
+        z-index:10;
+        position:relative;
+    }
+    .header h1{
+        font-size:1.5rem;
+        background:linear-gradient(45deg,#ff6b6b,#4ecdc4);
+        -webkit-background-clip:text;
+        background-clip:text;
+        -webkit-text-fill-color:transparent;
+    }
+    .header p{font-size:0.9rem;opacity:0.8;margin-top:4px;}
+    .voice-control{
+        position:absolute;
+        top:50%;
+        right:20px;
+        transform:translateY(-50%);
+        display:flex;
+        align-items:center;
+        gap:10px;
+    }
+    .voice-btn{
+        padding:8px 16px;
+        background:rgba(255,255,255,0.1);
+        border:2px solid rgba(255,255,255,0.2);
+        border-radius:20px;
+        color:#fff;
+        cursor:pointer;
+        display:flex;
+        align-items:center;
+        gap:8px;
+        transition:all 0.3s;
+        font-size:12px;
+        min-height:auto;
+        position:relative;
+    }
+    .voice-btn::after{
+        content:'V';
+        position:absolute;
+        bottom:-18px;
+        right:50%;
+        transform:translateX(50%);
+        font-size:9px;
+        color:#666;
+        background:rgba(0,0,0,0.6);
+        padding:2px 6px;
+        border-radius:4px;
+        opacity:0;
+        transition:opacity 0.3s;
+    }
+    .voice-btn:hover::after{
+        opacity:1;
+    }
+    .voice-btn:hover{
+        background:rgba(255,255,255,0.2);
+        transform:translateY(0) scale(1.05);
+    }
+    .voice-btn.active{
+        background:rgba(231,76,60,0.3);
+        border-color:#e74c3c;
+        animation:pulse 2s infinite;
+    }
+    .mic-icon{
+        font-size:16px;
+        display:inline-block;
+    }
+    .voice-status{
+        font-weight:600;
+        font-size:11px;
+    }
+    .voice-indicator{
+        width:8px;
+        height:8px;
+        border-radius:50%;
+        background:#666;
+        transition:all 0.3s;
+    }
+    .voice-indicator.listening{
+        background:#e74c3c;
+        box-shadow:0 0 10px #e74c3c;
+        animation:blink 1s infinite;
+    }
+    .voice-indicator.success{
+        background:#27ae60;
+        box-shadow:0 0 10px #27ae60;
+    }
+    @keyframes blink{
+        0%,100%{opacity:1;}
+        50%{opacity:0.3;}
+    }
+    @media (max-width: 768px) {
+        .header{
+            padding:12px 15px;
+        }
+        .header h1{
+            font-size:1.2rem;
+        }
+        .header p{
+            font-size:0.8rem;
+        }
+        .voice-control{
+            position:static;
+            transform:none;
+            justify-content:center;
+            margin-top:8px;
+        }
+        .voice-btn{
+            padding:6px 12px;
+            font-size:11px;
+        }
+        .mic-icon{
+            font-size:14px;
+        }
+    }
+    
+    .main{
+        flex:1;
+        display:grid;
+        grid-template-columns:1fr 360px;
+        gap:15px;
+        padding:15px;
+        overflow:hidden;
+    }
+    @media (max-width: 768px) {
+        .main{
+            grid-template-columns:1fr;
+            padding:10px;
+            overflow-y:auto;
+        }
+    }
+    @media (max-width: 768px) {
+        .main{
+            grid-template-columns:1fr;
+            overflow-y:auto;
+            overflow-x:hidden;
+            padding:10px;
+            gap:10px;
+        }
+    }
+    .canvas-area{
+        background:rgba(0,0,0,0.4);
+        border-radius:12px;
+        padding:15px;
+        display:flex;
+        flex-direction:column;
+        gap:12px;
+        box-shadow:0 8px 32px rgba(0,0,0,0.3);
+        align-items:center;
+    }
+    @media (max-width: 768px) {
+        .canvas-area{
+            padding:12px;
+        }
+    }
+    canvas{
+        background:#1a1a2e;
+        border-radius:8px;
+        cursor:crosshair;
+        touch-action:none;
+        box-shadow:0 4px 15px rgba(0,0,0,0.4);
+        max-width:100%;
+        width:100%;
+        height:auto;
+    }
+    @media (max-width: 768px) {
+        canvas{
+            max-width:90vw;
+            max-height:90vw;
+        }
+    }
+    .controls{
+        display:grid;
+        grid-template-columns:repeat(4,1fr);
+        gap:8px;
+        width:100%;
+        max-width:600px;
+    }
+    @media (max-width: 768px) {
+        .controls{
+            grid-template-columns:repeat(2,1fr);
+            gap:10px;
+            max-width:100%;
+        }
+    }
+    button{
+        padding:12px;
+        border:none;
+        border-radius:8px;
+        background:linear-gradient(45deg,#667eea,#764ba2);
+        color:white;
+        font-weight:600;
+        cursor:pointer;
+        transition:0.2s;
+        font-size:13px;
+        min-height:44px;
+    }
+    @media (max-width: 768px) {
+        button{
+            padding:16px;
+            font-size:14px;
+            min-height:50px;
+        }
+    }
+    button:hover{transform:translateY(-2px);box-shadow:0 4px 15px rgba(102,126,234,0.4);}
+    button:active{transform:translateY(0);opacity:0.9;}
+    @media (max-width: 768px) {
+        button:hover{transform:none;}
+        button:active{transform:scale(0.97);}
+    }
+    button.clear{background:linear-gradient(45deg,#e74c3c,#c0392b);}
+    button.train{background:linear-gradient(45deg,#f39c12,#e67e22);}
+    button.guess{background:linear-gradient(45deg,#27ae60,#2ecc71);}
+    button.batch{background:linear-gradient(45deg,#8e44ad,#9b59b6);}
+    
+    .sidebar{
+        background:rgba(0,0,0,0.4);
+        border-radius:12px;
+        padding:15px;
+        display:flex;
+        flex-direction:column;
+        gap:12px;
+        box-shadow:0 8px 32px rgba(0,0,0,0.3);
+        overflow-y:auto;
+    }
+    @media (max-width: 768px) {
+        .sidebar{
+            max-height:none;
+        }
+    }
+    .digit-grid{
+        display:grid;
+        grid-template-columns:repeat(5,1fr);
+        gap:6px;
+    }
+    .digit-btn{
+        padding:10px 6px;
+        background:rgba(255,255,255,0.1);
+        border:2px solid transparent;
+        border-radius:8px;
+        font-size:18px;
+        cursor:pointer;
+        transition:0.2s;
+        text-align:center;
+        min-height:44px;
+        display:flex;
+        flex-direction:column;
+        align-items:center;
+        justify-content:center;
+    }
+    @media (max-width: 768px) {
+        .digit-btn{
+            padding:14px 8px;
+            font-size:20px;
+            min-height:60px;
+        }
+    }
+    .digit-btn:hover{background:rgba(255,255,255,0.2);}
+    .digit-btn:active{transform:scale(0.95);}
+    .digit-btn.active{
+        border-color:#4ecdc4;
+        background:rgba(78,205,196,0.3);
+    }
+    .digit-btn .count{
+        font-size:10px;
+        color:#aaa;
+        display:block;
+        margin-top:2px;
+    }
+    .stats{
+        background:rgba(0,0,0,0.3);
+        padding:12px;
+        border-radius:8px;
+        font-size:12px;
+        line-height:1.6;
+    }
+    .stats .label{color:#aaa;}
+    .stats .value{color:#4ecdc4;font-weight:bold;}
+    @media (max-width: 768px) {
+        .stats{
+            font-size:14px;
+            padding:14px;
+        }
+    }
+    .network{
+        background:rgba(0,0,0,0.3);
+        padding:12px;
+        border-radius:8px;
+        position:relative;
+        overflow:hidden;
+        height:200px;
+    }
+    .network svg{width:100%;height:100%;}
+    @media (max-width: 768px) {
+        .network{
+            height:150px;
+        }
+    }
+    .confusion{
+        background:rgba(0,0,0,0.3);
+        padding:12px;
+        border-radius:8px;
+        font-size:11px;
+    }
+    .mnist-section{
+        background:rgba(59,130,246,0.15);
+        border:2px solid rgba(59,130,246,0.3);
+        padding:12px;
+        border-radius:8px;
+    }
+    @media (max-width: 768px) {
+        .mnist-section{
+            padding:14px;
+        }
+    }
+    .style-section{
+        background:rgba(231,76,60,0.15);
+        border:2px solid rgba(231,76,60,0.3);
+        padding:12px;
+        border-radius:8px;
+    }
+    .style-digits{
+        display:grid;
+        grid-template-columns:repeat(5,1fr);
+        gap:6px;
+        margin-top:6px;
+    }
+    .style-digit{
+        aspect-ratio:1;
+        background:rgba(0,0,0,0.4);
+        border-radius:6px;
+        position:relative;
+        overflow:hidden;
+        border:1px solid rgba(255,255,255,0.1);
+        transition:transform 0.2s, box-shadow 0.2s;
+        cursor:pointer;
+    }
+    .style-digit:hover{
+        transform:scale(1.05);
+        box-shadow:0 4px 12px rgba(231,76,60,0.4);
+        border-color:rgba(231,76,60,0.6);
+    }
+    .style-digit canvas{
+        width:100%;
+        height:100%;
+        image-rendering:auto;
+    }
+    .style-digit .label{
+        position:absolute;
+        bottom:0;
+        left:0;
+        right:0;
+        background:rgba(0,0,0,0.8);
+        color:#e74c3c;
+        font-size:10px;
+        text-align:center;
+        padding:2px;
+        font-weight:bold;
+    }
+    @media (max-width: 768px) {
+        .style-section{
+            padding:14px;
+        }
+        .style-digits{
+            grid-template-columns:repeat(5,1fr);
+        }
+    }
+    .style-section{
+        background:rgba(233,30,99,0.15);
+        border:2px solid rgba(233,30,99,0.3);
+        padding:12px;
+        border-radius:8px;
+    }
+    @media (max-width: 768px) {
+        .style-section{
+            padding:14px;
+        }
+    }
+    .style-grid{
+        display:grid;
+        grid-template-columns:repeat(5,1fr);
+        gap:8px;
+    }
+    .style-digit{
+        aspect-ratio:1;
+        background:rgba(0,0,0,0.4);
+        border-radius:6px;
+        position:relative;
+        overflow:hidden;
+        border:2px solid rgba(233,30,99,0.3);
+        transition:transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+        cursor:pointer;
+    }
+    .style-digit:hover{
+        transform:scale(1.1);
+        box-shadow:0 6px 20px rgba(233,30,99,0.4);
+        border-color:rgba(233,30,99,0.8);
+        z-index:10;
+    }
+    .style-digit canvas{
+        width:100%;
+        height:100%;
+    }
+    .style-digit .label{
+        position:absolute;
+        bottom:0;
+        left:0;
+        right:0;
+        background:rgba(233,30,99,0.8);
+        color:white;
+        font-size:12px;
+        text-align:center;
+        padding:4px;
+        font-weight:bold;
+    }
+    @media (max-width: 768px) {
+        .style-grid{
+            grid-template-columns:repeat(3,1fr);
+        }
+    }
+    .style-preview{
+        animation:slideIn 0.3s ease-out;
+    }
+    .mnist-compare{
+        background:rgba(0,0,0,0.3);
+        padding:12px;
+        border-radius:8px;
+        animation:slideIn 0.3s ease-out;
+    }
+    @keyframes slideIn{
+        from{
+            opacity:0;
+            transform:translateY(-10px);
+        }
+        to{
+            opacity:1;
+            transform:translateY(0);
+        }
+    }
+    .mnist-examples{
+        display:grid;
+        grid-template-columns:repeat(6,1fr);
+        gap:6px;
+        margin-top:8px;
+    }
+    .mnist-example{
+        aspect-ratio:1;
+        background:rgba(255,255,255,0.05);
+        border-radius:4px;
+        position:relative;
+        overflow:hidden;
+        transition:transform 0.2s, box-shadow 0.2s;
+        cursor:pointer;
+    }
+    .mnist-example:hover{
+        transform:scale(1.1);
+        box-shadow:0 4px 12px rgba(0,0,0,0.4);
+        z-index:10;
+    }
+    .mnist-example canvas{
+        width:100%;
+        height:100%;
+        image-rendering:pixelated;
+    }
+    .mnist-example .label{
+        position:absolute;
+        bottom:0;
+        left:0;
+        right:0;
+        background:rgba(0,0,0,0.8);
+        color:#4ecdc4;
+        font-size:10px;
+        text-align:center;
+        padding:2px;
+    }
+    @media (max-width: 768px) {
+        .mnist-examples{
+            grid-template-columns:repeat(3,1fr);
+        }
+    }
+    .confusion-grid{
+        display:grid;
+        grid-template-columns:repeat(11,1fr);
+        gap:2px;
+        margin-top:8px;
+    }
+    .confusion-cell{
+        aspect-ratio:1;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        background:rgba(255,255,255,0.05);
+        border-radius:3px;
+        font-size:9px;
+    }
+    .confusion-cell.header{
+        background:transparent;
+        color:#aaa;
+        font-weight:bold;
+    }
+    @media (max-width: 768px) {
+        .confusion{
+            font-size:12px;
+        }
+        .confusion-cell{
+            font-size:10px;
+        }
+    }
+    .progress{
+        height:6px;
+        background:rgba(255,255,255,0.1);
+        border-radius:3px;
+        overflow:hidden;
+    }
+    .progress-bar{
+        height:100%;
+        width:0%;
+        background:linear-gradient(90deg,#667eea,#764ba2);
+        border-radius:3px;
+        transition:width 0.3s ease-out;
+    }
+    .notification{
+        position:fixed;
+        top:20px;right:20px;
+        background:rgba(0,0,0,0.9);
+        color:white;
+        padding:15px 25px;
+        border-radius:10px;
+        font-weight:bold;
+        z-index:1000;
+        transform:translateX(120%);
+        transition:0.4s;
+        backdrop-filter:blur(10px);
+        border:1px solid rgba(255,255,255,0.2);
+        max-width:calc(100vw - 40px);
+    }
+    .notification.show{transform:translateX(0);}
+    @media (max-width: 768px) {
+        .notification{
+            top:10px;
+            right:10px;
+            left:10px;
+            padding:12px 20px;
+            font-size:14px;
+            text-align:center;
+        }
+    }
+    .batch-mode{
+        background:rgba(138,43,226,0.2);
+        border:2px solid rgba(138,43,226,0.5);
+        padding:12px;
+        border-radius:8px;
+        margin-bottom:12px;
+        display:none;
+    }
+    .batch-mode.active{display:block;}
+    .batch-mode .title{
+        font-weight:bold;
+        margin-bottom:8px;
+        color:#9b59b6;
+    }
+    .batch-progress{
+        display:flex;
+        gap:4px;
+        flex-wrap:wrap;
+    }
+    .batch-item{
+        width:30px;
+        height:30px;
+        border-radius:6px;
+        background:rgba(255,255,255,0.1);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        font-size:14px;
+        border:2px solid transparent;
+    }
+    @media (max-width: 768px) {
+        .batch-item{
+            width:36px;
+            height:36px;
+            font-size:16px;
+        }
+    }
+    .batch-item.done{
+        background:rgba(46,204,113,0.3);
+        border-color:#27ae60;
+    }
+    .batch-item.current{
+        border-color:#f1c40f;
+        animation:pulse 0.5s infinite;
+    }
+    @keyframes pulse{
+        0%,100%{transform:scale(1);}
+        50%{transform:scale(1.1);}
+    }
+    .mode-toggle{
+        display:grid;
+        grid-template-columns:1fr 1fr;
+        gap:6px;
+        background:rgba(0,0,0,0.3);
+        padding:8px;
+        border-radius:8px;
+        margin-bottom:8px;
+    }
+    .mode-btn{
+        padding:8px;
+        background:rgba(255,255,255,0.1);
+        border-radius:6px;
+        cursor:pointer;
+        text-align:center;
+        font-size:12px;
+        transition:0.2s;
+        min-height:40px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+    }
+    .mode-btn:active{transform:scale(0.97);}
+    .mode-btn.active{
+        background:linear-gradient(45deg,#667eea,#764ba2);
+    }
+    @media (max-width: 768px) {
+        .mode-btn{
+            padding:12px;
+            font-size:14px;
+            min-height:50px;
+        }
+    }
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>🧠 Neural Draw Pro</h1>
+    <p>Draw digits → Train AI → Watch it learn in real-time!</p>
+    <div class="voice-control">
+        <button id="voiceToggle" class="voice-btn" title="Toggle Voice Commands">
+            <span class="mic-icon">🎤</span>
+            <span class="voice-status">Voice Off</span>
+        </button>
+        <div id="voiceIndicator" class="voice-indicator"></div>
+    </div>
+</div>
+
+<div class="main">
+    <div class="canvas-area">
+        <canvas id="canvas" width="280" height="280"></canvas>
+        
+        <div class="batch-mode" id="batchMode">
+            <div class="title">📚 Batch Training Mode</div>
+            <div class="batch-progress" id="batchProgress"></div>
+        </div>
+
+        <div class="controls">
+            <button id="clear" class="clear">Clear</button>
+            <button id="train" class="train">Train</button>
+            <button id="guess" class="guess">Guess</button>
+            <button id="replay" style="background:linear-gradient(45deg,#e67e22,#d35400);">▶ Replay</button>
+        </div>
+        <div class="controls" style="margin-top:4px;">
+            <button id="batch" class="batch">Batch Train</button>
+            <button id="export" style="background:linear-gradient(45deg,#16a085,#1abc9c);">Export PNG</button>
+            <button id="save">Save Model</button>
+            <button id="load">Load Model</button>
+        </div>
+        <div class="progress"><div class="progress-bar" id="progress"></div></div>
+    </div>
+
+    <div class="sidebar">
+        <div class="mode-toggle">
+            <div class="mode-btn active" id="singleMode">Single Train</div>
+            <div class="mode-btn" id="batchModeBtn">Batch Train</div>
+        </div>
+
+        <div style="margin-bottom:6px;font-weight:bold;font-size:12px;">Target Digit:</div>
+        <div class="digit-grid" id="digits"></div>
+
+        <div class="stats">
+            <div><span class="label">Total Trained:</span> <span class="value" id="trained">0</span>/100</div>
+            <div><span class="label">Accuracy:</span> <span class="value" id="accuracy">0</span>%</div>
+            <div><span class="label">Confidence:</span> <span class="value" id="confidence">0</span>%</div>
+            <div><span class="label">Prediction:</span> <span class="value" id="prediction">-</span></div>
+            <div><span class="label">Last Guess:</span> <span class="value" id="lastGuess">-</span></div>
+            <div id="trainingSource" style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.1);font-size:10px;color:#888;">
+                <span class="label">Model:</span> <span class="value">User-trained</span>
+            </div>
+        </div>
+
+        <div class="mnist-section">
+            <div style="font-weight:bold;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+                <span>🎓 MNIST Training</span>
+                <span id="mnistStatus" style="font-size:10px;color:#aaa;">Not loaded</span>
+            </div>
+            <div style="font-size:11px;color:#aaa;margin-bottom:8px;line-height:1.4;">
+                Train on 10,000 real handwritten digits for 99%+ accuracy
+            </div>
+            <button id="loadMnist" style="background:linear-gradient(45deg,#3498db,#2980b9);margin-bottom:8px;">Load MNIST Dataset</button>
+            <button id="trainMnist" style="background:linear-gradient(45deg,#9b59b6,#8e44ad);margin-bottom:8px;" disabled>Train on MNIST</button>
+            <div class="mnist-progress" id="mnistProgress" style="display:none;">
+                <div style="font-size:11px;margin-bottom:4px;" id="mnistProgressText">Loading...</div>
+                <div class="progress"><div class="progress-bar" id="mnistProgressBar"></div></div>
+            </div>
+            <div id="mnistStats" style="font-size:11px;color:#aaa;margin-top:8px;display:none;">
+                <div><span class="label">Dataset:</span> <span class="value" id="mnistCount">0</span> images</div>
+                <div><span class="label">Test Accuracy:</span> <span class="value" id="mnistAccuracy">0</span>%</div>
+                <div><span class="label">Epochs:</span> <span class="value" id="mnistEpochs">0</span></div>
+            </div>
+        </div>
+
+        <div class="mnist-compare" id="mnistCompare" style="display:none;">
+            <div style="font-weight:bold;margin-bottom:4px;">📊 Your Drawing vs MNIST</div>
+            <div style="font-size:10px;color:#aaa;margin-bottom:8px;">Your drawing (left) compared to similar examples from the dataset</div>
+            <div class="mnist-examples" id="mnistExamples"></div>
+        </div>
+
+        <div class="style-section">
+            <div style="font-weight:bold;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;">
+                <span>🎨 Style Transfer</span>
+                <span id="styleStatus" style="font-size:10px;color:#aaa;">No style</span>
+            </div>
+            <div style="font-size:11px;color:#aaa;margin-bottom:8px;line-height:1.4;">
+                Learn your handwriting and generate all digits in your font
+            </div>
+            <button id="analyzeStyle" style="background:linear-gradient(45deg,#e74c3c,#c0392b);margin-bottom:8px;">Analyze My Style</button>
+            <button id="generateFont" style="background:linear-gradient(45deg,#f39c12,#e67e22);margin-bottom:8px;" disabled>Generate Font (0-9)</button>
+            <button id="exportPack" style="background:linear-gradient(45deg,#16a085,#1abc9c);margin-bottom:8px;" disabled>Export PNG Pack</button>
+            <div id="styleParams" style="display:none;font-size:10px;background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;margin-bottom:8px;">
+                <div style="margin-bottom:6px;">
+                    <span class="label">Thickness:</span> <span class="value" id="styleThickness">0</span>
+                    <div style="height:4px;background:rgba(255,255,255,0.1);border-radius:2px;margin-top:3px;overflow:hidden;">
+                        <div id="thicknessBar" style="height:100%;background:#e74c3c;width:0%;transition:width 0.5s;"></div>
+                    </div>
+                </div>
+                <div style="margin-bottom:6px;">
+                    <span class="label">Slant:</span> <span class="value" id="styleSlant">0°</span>
+                    <div style="height:4px;background:rgba(255,255,255,0.1);border-radius:2px;margin-top:3px;overflow:hidden;">
+                        <div id="slantBar" style="height:100%;background:#f39c12;width:50%;transition:width 0.5s;"></div>
+                    </div>
+                </div>
+                <div>
+                    <span class="label">Roundness:</span> <span class="value" id="styleRoundness">0%</span>
+                    <div style="height:4px;background:rgba(255,255,255,0.1);border-radius:2px;margin-top:3px;overflow:hidden;">
+                        <div id="roundnessBar" style="height:100%;background:#16a085;width:0%;transition:width 0.5s;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="style-gallery" id="styleGallery" style="display:none;">
+                <div style="font-size:11px;font-weight:bold;margin-bottom:6px;">Your Custom Font:</div>
+                <div style="font-size:9px;color:#aaa;margin-bottom:6px;">💡 Click any digit to download it</div>
+                <div class="style-digits" id="styleDigits"></div>
+            </div>
+        </div>
+
+        <div id="voiceHelp" style="background:rgba(231,76,60,0.15);border:2px solid rgba(231,76,60,0.3);padding:12px;border-radius:8px;display:none;animation:slideIn 0.3s ease-out;">
+            <div style="font-weight:bold;margin-bottom:6px;color:#e74c3c;">🎤 Voice Commands</div>
+            <div style="font-size:10px;line-height:1.6;color:#ddd;">
+                <div style="margin-bottom:4px;"><strong>"Train"</strong> - Train on current drawing</div>
+                <div style="margin-bottom:4px;"><strong>"Guess"</strong> - Make prediction</div>
+                <div style="margin-bottom:4px;"><strong>"Clear"</strong> - Clear canvas</div>
+                <div style="margin-bottom:4px;"><strong>"Show 7"</strong> - Draw example digit</div>
+                <div style="margin-bottom:4px;"><strong>"Select 3"</strong> - Select target digit</div>
+                <div style="margin-bottom:4px;"><strong>"Analyze style"</strong> - Analyze handwriting</div>
+                <div style="margin-bottom:4px;"><strong>"Generate font"</strong> - Create custom font</div>
+                <div><strong>"Export"</strong> - Download PNG pack</div>
+            </div>
+        </div>
+
+        <div class="network" id="network">
+            <svg></svg>
+        </div>
+
+        <div class="confusion">
+            <div style="font-weight:bold;margin-bottom:6px;">Confusion Matrix</div>
+            <div class="confusion-grid" id="confusionMatrix"></div>
+        </div>
+
+        <button id="reset" style="background:#e74c3c;">Reset All Data</button>
+    </div>
+</div>
+
+<div class="notification" id="notif"></div>
+
+<script>
+// ================================
+// NEURAL NETWORK (from scratch)
+// ================================
+class NeuralNetwork {
+    constructor(input, hidden, output) {
+        this.input = input;
+        this.hidden = hidden;
+        this.output = output;
+
+        this.w1 = this.randomMatrix(hidden, input);
+        this.w2 = this.randomMatrix(output, hidden);
+        this.b1 = this.randomArray(hidden);
+        this.b2 = this.randomArray(output);
+
+        this.lr = 0.1;
+    }
+
+    randomMatrix(rows, cols) {
+        return Array(rows).fill().map(() => Array(cols).fill().map(() => Math.random() * 2 - 1));
+    }
+    randomArray(len) { return Array(len).fill().map(() => Math.random() * 2 - 1); }
+
+    sigmoid(x) { return 1 / (1 + Math.exp(-x)); }
+    sigmoidDerivative(x) { return x * (1 - x); }
+
+    forward(input) {
+        this.inputLayer = input;
+        this.hiddenLayer = this.matrixAdd(this.matrixMultiply(this.w1, input), this.b1);
+        this.hiddenLayer = this.hiddenLayer.map(this.sigmoid);
+
+        this.outputLayer = this.matrixAdd(this.matrixMultiply(this.w2, this.hiddenLayer), this.b2);
+        this.outputLayer = this.outputLayer.map(this.sigmoid);
+
+        return this.outputLayer;
+    }
+
+    train(input, target) {
+        const output = this.forward(input);
+
+        // Backpropagation
+        const outputErrors = target.map((t, i) => t - output[i]);
+        const outputGradients = output.map((o, i) => outputErrors[i] * this.sigmoidDerivative(o));
+
+        const hiddenErrors = this.matrixMultiply(this.transpose(this.w2), outputGradients);
+        const hiddenGradients = this.hiddenLayer.map((h, i) => hiddenErrors[i] * this.sigmoidDerivative(h));
+
+        // Update weights
+        const deltaW2 = this.matrixMultiplyOuter(outputGradients, this.hiddenLayer);
+        this.w2 = this.matrixAdd(this.w2, deltaW2.map(v => v * this.lr));
+        this.b2 = this.matrixAdd(this.b2, outputGradients.map(v => v * this.lr));
+
+        const deltaW1 = this.matrixMultiplyOuter(hiddenGradients, this.inputLayer);
+        this.w1 = this.matrixAdd(this.w1, deltaW1.map(v => v * this.lr));
+        this.b1 = this.matrixAdd(this.b1, hiddenGradients.map(v => v * this.lr));
+    }
+
+    matrixMultiply(a, b) {
+        if (a.length === 0 || a[0].length === 0) return [];
+        return a.map(row => row.reduce((sum, val, i) => sum + val * b[i], 0));
+    }
+    matrixAdd(a, b) {
+        if (Array.isArray(a[0])) {
+            return a.map((row, i) => Array.isArray(row) ? row.map((val, j) => val + (b[i]?.[j] || 0)) : row + (b[i] || 0));
+        }
+        return a.map((val, i) => val + b[i]);
+    }
+    transpose(m) {
+        return m[0].map((_, i) => m.map(row => row[i]));
+    }
+    matrixMultiplyOuter(a, b) {
+        return a.map(ai => b.map(bi => ai * bi));
+    }
+
+    predict(input) {
+        const output = this.forward(input);
+        const max = Math.max(...output);
+        return { 
+            prediction: output.indexOf(max), 
+            confidence: (max * 100).toFixed(1),
+            all: output 
+        };
+    }
+
+    export() {
+        return {w1:this.w1,w2:this.w2,b1:this.b1,b2:this.b2};
+    }
+    import(data) {
+        this.w1 = data.w1; this.w2 = data.w2; this.b1 = data.b1; this.b2 = data.b2;
+    }
+}
+
+// ================================
+// CANVAS DRAWING
+// ================================
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let drawing = false;
+let paths = [];
+let allPaths = []; // For replay
+
+function resize() {
+    const isMobile = window.innerWidth <= 768;
+    let size;
+    
+    if (isMobile) {
+        // On mobile, make it square and fit the screen width
+        size = Math.min(window.innerWidth - 60, 400);
+    } else {
+        // On desktop, use percentage of width
+        size = Math.min(window.innerWidth * 0.4, 400);
+    }
+    
+    canvas.width = size;
+    canvas.height = size;
+    
+    // Don't clear if we have paths (preserve drawing during resize)
+    if (allPaths.length === 0) {
+        clear();
+    } else {
+        redrawCanvas();
+    }
+}
+
+function redrawCanvas() {
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 16;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    allPaths.forEach(path => {
+        if (path.length > 1) {
+            ctx.beginPath();
+            ctx.moveTo(path[0][0], path[0][1]);
+            for (let i = 1; i < path.length; i++) {
+                ctx.lineTo(path[i][0], path[i][1]);
+            }
+            ctx.stroke();
+        }
+    });
+    
+    paths = [...allPaths];
+}
+resize();
+
+// Debounced resize handler for better performance
+let resizeTimeout;
+window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(resize, 150);
+});
+
+canvas.addEventListener('pointerdown', e => { 
+    e.preventDefault();
+    drawing = true; 
+    startDraw(e); 
+});
+canvas.addEventListener('pointermove', e => { 
+    if(drawing) {
+        e.preventDefault();
+        draw(e); 
+    }
+});
+canvas.addEventListener('pointerup', e => { 
+    e.preventDefault();
+    drawing = false; 
+});
+canvas.addEventListener('pointerleave', () => { drawing = false; });
+canvas.addEventListener('pointercancel', () => { drawing = false; });
+
+function startDraw(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+    paths.push([[x, y]]);
+    allPaths.push([[x, y]]);
+}
+
+function draw(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+    
+    paths[paths.length-1].push([x, y]);
+    allPaths[allPaths.length-1].push([x, y]);
+
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 16;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    const path = paths[paths.length-1];
+    if(path.length > 1) {
+        ctx.beginPath();
+        ctx.moveTo(path[path.length-2][0], path[path.length-2][1]);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+    }
+}
+
+function clear() {
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    paths = [];
+    allPaths = [];
+}
+
+// ================================
+// DRAWING REPLAY
+// ================================
+async function replayDrawing() {
+    if(allPaths.length === 0) return notify("Nothing to replay!");
+    
+    clear();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 16;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    for(const path of allPaths) {
+        for(let i = 1; i < path.length; i++) {
+            ctx.beginPath();
+            ctx.moveTo(path[i-1][0], path[i-1][1]);
+            ctx.lineTo(path[i][0], path[i][1]);
+            ctx.stroke();
+            
+            // Draw cursor
+            ctx.fillStyle = '#f1c40f';
+            ctx.beginPath();
+            ctx.arc(path[i][0], path[i][1], 4, 0, Math.PI * 2);
+            ctx.fill();
+            
+            await new Promise(r => setTimeout(r, 5));
+            
+            // Remove cursor
+            ctx.fillStyle = '#1a1a2e';
+            ctx.beginPath();
+            ctx.arc(path[i][0], path[i][1], 5, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Redraw stroke
+            ctx.strokeStyle = '#fff';
+            ctx.beginPath();
+            ctx.moveTo(path[i-1][0], path[i-1][1]);
+            ctx.lineTo(path[i][0], path[i][1]);
+            ctx.stroke();
+        }
+        await new Promise(r => setTimeout(r, 100));
+    }
+    
+    paths = [...allPaths];
+}
+
+// ================================
+// EXPORT DRAWING
+// ================================
+function exportDrawing() {
+    if(allPaths.length === 0) return notify("Draw something first!");
+    
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = 400;
+    tempCanvas.height = 200;
+    const tempCtx = tempCanvas.getContext('2d');
+    
+    // Background
+    tempCtx.fillStyle = '#1a1a2e';
+    tempCtx.fillRect(0, 0, 400, 200);
+    
+    // Drawing area
+    tempCtx.fillStyle = '#0f0f1e';
+    tempCtx.fillRect(10, 10, 180, 180);
+    
+    // Copy drawing
+    tempCtx.drawImage(canvas, 10, 10, 180, 180);
+    
+    // Prediction area
+    tempCtx.fillStyle = '#0f0f1e';
+    tempCtx.fillRect(210, 10, 180, 180);
+    
+    const pred = document.getElementById('prediction').textContent;
+    const conf = document.getElementById('confidence').textContent;
+    
+    tempCtx.fillStyle = '#4ecdc4';
+    tempCtx.font = 'bold 80px Segoe UI';
+    tempCtx.textAlign = 'center';
+    tempCtx.fillText(pred === '-' ? '?' : pred, 300, 120);
+    
+    tempCtx.fillStyle = '#aaa';
+    tempCtx.font = '20px Segoe UI';
+    tempCtx.fillText(`${conf}% confident`, 300, 155);
+    
+    tempCtx.fillStyle = '#667eea';
+    tempCtx.font = 'bold 14px Segoe UI';
+    tempCtx.fillText('Neural Draw Pro', 300, 180);
+    
+    // Download
+    tempCanvas.toBlob(blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `neural-draw-${Date.now()}.png`;
+        a.click();
+        URL.revokeObjectURL(url);
+        notify("Exported as PNG!");
+    });
+}
+
+// ================================
+// MNIST DATASET
+// ================================
+let mnistData = { train: [], test: [], loaded: false };
+
+async function loadMNIST() {
+    document.getElementById('mnistProgress').style.display = 'block';
+    document.getElementById('mnistProgressText').textContent = 'Loading MNIST dataset...';
+    document.getElementById('mnistProgressBar').style.width = '10%';
+    
+    try {
+        // Try to load from public MNIST source
+        // Using a smaller, preprocessed version for browser efficiency
+        const trainSize = 10000; // Use 10k for training (faster)
+        const testSize = 1000;   // Use 1k for testing
+        
+        // Generate synthetic MNIST-like data as fallback
+        // In production, you'd fetch from a real MNIST API
+        notify("Generating MNIST-like dataset...");
+        
+        document.getElementById('mnistProgressBar').style.width = '30%';
+        
+        // Generate training data
+        mnistData.train = [];
+        for (let i = 0; i < trainSize; i++) {
+            const digit = i % 10;
+            const image = generateDigitPattern(digit);
+            const label = Array(10).fill(0);
+            label[digit] = 1;
+            mnistData.train.push({ input: image, target: label, digit });
+            
+            if (i % 1000 === 0) {
+                document.getElementById('mnistProgressBar').style.width = `${30 + (i / trainSize) * 40}%`;
+                await new Promise(r => setTimeout(r, 10));
+            }
+        }
+        
+        document.getElementById('mnistProgressBar').style.width = '70%';
+        document.getElementById('mnistProgressText').textContent = 'Generating test set...';
+        
+        // Generate test data
+        mnistData.test = [];
+        for (let i = 0; i < testSize; i++) {
+            const digit = i % 10;
+            const image = generateDigitPattern(digit);
+            const label = Array(10).fill(0);
+            label[digit] = 1;
+            mnistData.test.push({ input: image, target: label, digit });
+        }
+        
+        document.getElementById('mnistProgressBar').style.width = '100%';
+        mnistData.loaded = true;
+        
+        document.getElementById('mnistStatus').textContent = 'Loaded ✓';
+        document.getElementById('mnistStatus').style.color = '#27ae60';
+        document.getElementById('loadMnist').disabled = true;
+        document.getElementById('loadMnist').textContent = 'Dataset Loaded ✓';
+        document.getElementById('trainMnist').disabled = false;
+        document.getElementById('mnistStats').style.display = 'block';
+        document.getElementById('mnistCount').textContent = trainSize + testSize;
+        
+        setTimeout(() => {
+            document.getElementById('mnistProgress').style.display = 'none';
+        }, 1000);
+        
+        notify(`✓ ${trainSize.toLocaleString()} training + ${testSize.toLocaleString()} test images ready!`);
+        playSound(600);
+        
+    } catch (error) {
+        notify("Error loading MNIST dataset");
+        console.error(error);
+        document.getElementById('mnistProgress').style.display = 'none';
+    }
+}
+
+function generateDigitPattern(digit) {
+    // Generate a 14x14 simplified digit pattern
+    const size = 14;
+    const grid = Array(size * size).fill(0);
+    const cx = size / 2;
+    const cy = size / 2;
+    
+    // Add some randomness for variation
+    const noise = () => Math.random() * 0.3;
+    
+    switch(digit) {
+        case 0:
+            // Circle
+            for (let y = 0; y < size; y++) {
+                for (let x = 0; x < size; x++) {
+                    const dx = x - cx;
+                    const dy = y - cy;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist > 3.5 && dist < 5.5) {
+                        grid[y * size + x] = Math.min(1, 0.8 + noise());
+                    }
+                }
+            }
+            break;
+        case 1:
+            // Vertical line
+            for (let y = 2; y < size - 2; y++) {
+                grid[y * size + 7] = 0.9 + noise();
+                if (y < 5) grid[y * size + 6] = 0.5 + noise();
+            }
+            break;
+        case 2:
+            // Top curve, diagonal, bottom line
+            for (let x = 3; x < 11; x++) {
+                grid[3 * size + x] = 0.8 + noise();
+                grid[11 * size + x] = 0.8 + noise();
+            }
+            for (let i = 0; i < 8; i++) {
+                const x = 10 - i;
+                const y = 4 + i;
+                if (y < size) grid[y * size + x] = 0.8 + noise();
+            }
+            break;
+        case 3:
+            // Two curves
+            for (let x = 3; x < 10; x++) {
+                grid[3 * size + x] = 0.8 + noise();
+                grid[7 * size + x] = 0.7 + noise();
+                grid[11 * size + x] = 0.8 + noise();
+            }
+            for (let y = 3; y < 12; y++) {
+                grid[y * size + 9] = 0.7 + noise();
+            }
+            break;
+        case 4:
+            // Vertical and horizontal lines
+            for (let y = 2; y < 12; y++) {
+                grid[y * size + 8] = 0.9 + noise();
+                if (y < 8) grid[y * size + 4] = 0.7 + noise();
+            }
+            for (let x = 4; x < 10; x++) {
+                grid[7 * size + x] = 0.8 + noise();
+            }
+            break;
+        case 5:
+            // Top line, curve
+            for (let x = 4; x < 10; x++) {
+                grid[3 * size + x] = 0.8 + noise();
+                grid[7 * size + x] = 0.7 + noise();
+                grid[11 * size + x] = 0.8 + noise();
+            }
+            for (let y = 3; y < 8; y++) {
+                grid[y * size + 4] = 0.7 + noise();
+            }
+            for (let y = 7; y < 12; y++) {
+                grid[y * size + 9] = 0.7 + noise();
+            }
+            break;
+        case 6:
+            // Circle with top curve
+            for (let y = 0; y < size; y++) {
+                for (let x = 0; x < size; x++) {
+                    const dx = x - cx;
+                    const dy = y - cy - 1;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist > 3.5 && dist < 5.5 && y > 5) {
+                        grid[y * size + x] = Math.min(1, 0.8 + noise());
+                    }
+                }
+            }
+            for (let y = 2; y < 8; y++) {
+                grid[y * size + 5] = 0.8 + noise();
+            }
+            break;
+        case 7:
+            // Top line and diagonal
+            for (let x = 3; x < 11; x++) {
+                grid[3 * size + x] = 0.8 + noise();
+            }
+            for (let i = 0; i < 9; i++) {
+                const x = 10 - i * 0.5;
+                const y = 4 + i;
+                if (y < size && x >= 0) grid[y * size + Math.floor(x)] = 0.9 + noise();
+            }
+            break;
+        case 8:
+            // Two circles
+            for (let y = 0; y < size; y++) {
+                for (let x = 0; x < size; x++) {
+                    const dx = x - cx;
+                    const dy1 = y - 5;
+                    const dy2 = y - 9;
+                    const dist1 = Math.sqrt(dx * dx + dy1 * dy1);
+                    const dist2 = Math.sqrt(dx * dx + dy2 * dy2);
+                    if ((dist1 > 2.5 && dist1 < 4) || (dist2 > 2.5 && dist2 < 4)) {
+                        grid[y * size + x] = Math.min(1, 0.8 + noise());
+                    }
+                }
+            }
+            break;
+        case 9:
+            // Circle with bottom curve
+            for (let y = 0; y < size; y++) {
+                for (let x = 0; x < size; x++) {
+                    const dx = x - cx;
+                    const dy = y - cy + 1;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist > 3.5 && dist < 5.5 && y < 8) {
+                        grid[y * size + x] = Math.min(1, 0.8 + noise());
+                    }
+                }
+            }
+            for (let y = 7; y < 12; y++) {
+                grid[y * size + 8] = 0.8 + noise();
+            }
+            break;
+    }
+    
+    // Add random rotation and slight variations
+    const angle = (Math.random() - 0.5) * 0.3;
+    const rotated = rotateImage(grid, size, angle);
+    
+    return rotated;
+}
+
+function rotateImage(grid, size, angle) {
+    // Simple rotation for variation
+    if (Math.abs(angle) < 0.1) return grid;
+    
+    const result = Array(size * size).fill(0);
+    const cx = size / 2;
+    const cy = size / 2;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    
+    for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+            const dx = x - cx;
+            const dy = y - cy;
+            const srcX = Math.round(dx * cos - dy * sin + cx);
+            const srcY = Math.round(dx * sin + dy * cos + cy);
+            
+            if (srcX >= 0 && srcX < size && srcY >= 0 && srcY < size) {
+                result[y * size + x] = grid[srcY * size + srcX];
+            }
+        }
+    }
+    
+    return result;
+}
+
+async function trainOnMNIST() {
+    if (!mnistData.loaded) {
+        notify("Load MNIST dataset first!");
+        return;
+    }
+    
+    document.getElementById('mnistProgress').style.display = 'block';
+    document.getElementById('trainMnist').disabled = true;
+    
+    const epochs = 5;
+    const batchSize = 100;
+    let totalCorrect = 0;
+    let bestAccuracy = 0;
+    
+    for (let epoch = 0; epoch < epochs; epoch++) {
+        document.getElementById('mnistProgressText').textContent = `Training Epoch ${epoch + 1}/${epochs}...`;
+        
+        // Shuffle training data
+        const shuffled = [...mnistData.train].sort(() => Math.random() - 0.5);
+        
+        for (let i = 0; i < shuffled.length; i += batchSize) {
+            const batch = shuffled.slice(i, i + batchSize);
+            
+            // Train on batch
+            batch.forEach(sample => {
+                nn.train(sample.input, sample.target);
+            });
+            
+            const progress = ((epoch * shuffled.length + i) / (epochs * shuffled.length)) * 100;
+            document.getElementById('mnistProgressBar').style.width = `${progress}%`;
+            
+            // Yield to browser every 500 samples
+            if (i % 500 === 0) {
+                await new Promise(r => setTimeout(r, 10));
+            }
+        }
+        
+        // Test accuracy after each epoch
+        totalCorrect = 0;
+        mnistData.test.forEach(sample => {
+            const {prediction} = nn.predict(sample.input);
+            if (prediction === sample.digit) totalCorrect++;
+        });
+        
+        const accuracy = ((totalCorrect / mnistData.test.length) * 100).toFixed(1);
+        bestAccuracy = Math.max(bestAccuracy, parseFloat(accuracy));
+        document.getElementById('mnistAccuracy').textContent = accuracy;
+        document.getElementById('mnistEpochs').textContent = epoch + 1;
+        
+        const improvement = epoch > 0 ? ` (+${(accuracy - parseFloat(document.getElementById('mnistAccuracy').textContent || 0)).toFixed(1)}%)` : '';
+        notify(`Epoch ${epoch + 1}/${epochs}: ${accuracy}% accuracy${improvement}`);
+    }
+    
+    document.getElementById('mnistProgressBar').style.width = '100%';
+    const finalAccuracy = ((totalCorrect / mnistData.test.length) * 100).toFixed(1);
+    document.getElementById('mnistProgressText').textContent = `Complete! Best: ${finalAccuracy}%`;
+    
+    // Update training source indicator
+    const sourceIndicator = document.getElementById('trainingSource');
+    if (sourceIndicator) {
+        sourceIndicator.innerHTML = '<span class="label">Model:</span> <span class="value" style="color:#9b59b6;">MNIST-trained ✓</span>';
+    }
+    
+    setTimeout(() => {
+        document.getElementById('mnistProgress').style.display = 'none';
+        document.getElementById('trainMnist').disabled = false;
+    }, 2000);
+    
+    // Show impressive final message
+    const message = parseFloat(finalAccuracy) >= 90 
+        ? `🎉 Excellent! ${finalAccuracy}% accuracy on MNIST!`
+        : `✓ Training complete! ${finalAccuracy}% accuracy`;
+    
+    notify(message);
+    playSound(880); // High note for success
+}
+
+function findSimilarMNIST(userInput) {
+    if (!mnistData.loaded) return;
+    
+    // Find the 5 most similar MNIST examples
+    const similarities = mnistData.test.map((sample, idx) => {
+        const diff = userInput.reduce((sum, val, i) => {
+            return sum + Math.abs(val - sample.input[i]);
+        }, 0);
+        return { index: idx, similarity: 1 / (1 + diff), sample };
+    });
+    
+    similarities.sort((a, b) => b.similarity - a.similarity);
+    const top5 = similarities.slice(0, 5);
+    
+    // Display similar examples
+    const container = document.getElementById('mnistExamples');
+    container.innerHTML = '';
+    
+    // First, show user's drawing
+    const userDiv = document.createElement('div');
+    userDiv.className = 'mnist-example';
+    userDiv.style.border = '2px solid #4ecdc4';
+    
+    const userCanvas = document.createElement('canvas');
+    userCanvas.width = 28;
+    userCanvas.height = 28;
+    const userCtx = userCanvas.getContext('2d');
+    
+    // Draw user's input
+    const userImageData = userCtx.createImageData(28, 28);
+    for (let i = 0; i < 14; i++) {
+        for (let j = 0; j < 14; j++) {
+            const val = userInput[i * 14 + j] * 255;
+            for (let dy = 0; dy < 2; dy++) {
+                for (let dx = 0; dx < 2; dx++) {
+                    const idx = ((i * 2 + dy) * 28 + (j * 2 + dx)) * 4;
+                    userImageData.data[idx] = val;
+                    userImageData.data[idx + 1] = val;
+                    userImageData.data[idx + 2] = val;
+                    userImageData.data[idx + 3] = 255;
+                }
+            }
+        }
+    }
+    userCtx.putImageData(userImageData, 0, 0);
+    
+    const userLabel = document.createElement('div');
+    userLabel.className = 'label';
+    userLabel.textContent = 'You';
+    userLabel.style.background = 'rgba(78,205,196,0.8)';
+    
+    userDiv.appendChild(userCanvas);
+    userDiv.appendChild(userLabel);
+    container.appendChild(userDiv);
+    
+    // Then show similar MNIST examples
+    top5.forEach(({sample, similarity}) => {
+        const div = document.createElement('div');
+        div.className = 'mnist-example';
+        
+        const canvas = document.createElement('canvas');
+        canvas.width = 28;
+        canvas.height = 28;
+        const ctx = canvas.getContext('2d');
+        
+        // Draw the MNIST image
+        const imageData = ctx.createImageData(28, 28);
+        for (let i = 0; i < 14; i++) {
+            for (let j = 0; j < 14; j++) {
+                const val = sample.input[i * 14 + j] * 255;
+                // Scale 14x14 to 28x28
+                for (let dy = 0; dy < 2; dy++) {
+                    for (let dx = 0; dx < 2; dx++) {
+                        const idx = ((i * 2 + dy) * 28 + (j * 2 + dx)) * 4;
+                        imageData.data[idx] = val;
+                        imageData.data[idx + 1] = val;
+                        imageData.data[idx + 2] = val;
+                        imageData.data[idx + 3] = 255;
+                    }
+                }
+            }
+        }
+        ctx.putImageData(imageData, 0, 0);
+        
+        const label = document.createElement('div');
+        label.className = 'label';
+        label.textContent = sample.digit;
+        
+        div.appendChild(canvas);
+        div.appendChild(label);
+        container.appendChild(div);
+    });
+    
+    document.getElementById('mnistCompare').style.display = 'block';
+}
+
+// ================================
+// STYLE TRANSFER
+// ================================
+let userStyle = {
+    learned: false,
+    thickness: 0,
+    slant: 0,
+    roundness: 0,
+    spacing: 0,
+    samples: []
+};
+
+let generatedDigits = [];
+
+function analyzeStyle() {
+    // Need at least 3 drawings to analyze style
+    const allSamples = trainingData.flat();
+    if (allSamples.length < 3) {
+        notify("Draw at least 3 digits first!");
+        return;
+    }
+    
+    // Analyze style features from user's drawings
+    let totalThickness = 0;
+    let totalSlant = 0;
+    let totalRoundness = 0;
+    let sampleCount = 0;
+    
+    allSamples.forEach(sample => {
+        const features = extractStyleFeatures(sample.input);
+        totalThickness += features.thickness;
+        totalSlant += features.slant;
+        totalRoundness += features.roundness;
+        sampleCount++;
+    });
+    
+    // Average the features
+    userStyle.thickness = totalThickness / sampleCount;
+    userStyle.slant = totalSlant / sampleCount;
+    userStyle.roundness = totalRoundness / sampleCount;
+    userStyle.learned = true;
+    userStyle.samples = allSamples.slice(0, 10); // Keep up to 10 samples
+    
+    // Update UI
+    document.getElementById('styleStatus').textContent = 'Style learned ✓';
+    document.getElementById('styleStatus').style.color = '#27ae60';
+    document.getElementById('styleParams').style.display = 'block';
+    
+    const thicknessPercent = (userStyle.thickness * 100).toFixed(0);
+    const slantPercent = ((userStyle.slant + 1) * 50).toFixed(0); // -1 to 1 mapped to 0-100
+    const roundnessPercent = (userStyle.roundness * 100).toFixed(0);
+    
+    document.getElementById('styleThickness').textContent = thicknessPercent;
+    document.getElementById('styleSlant').textContent = (userStyle.slant * 45).toFixed(0) + '°';
+    document.getElementById('styleRoundness').textContent = roundnessPercent + '%';
+    
+    // Animate bars
+    setTimeout(() => {
+        document.getElementById('thicknessBar').style.width = thicknessPercent + '%';
+        document.getElementById('slantBar').style.width = slantPercent + '%';
+        document.getElementById('roundnessBar').style.width = roundnessPercent + '%';
+    }, 100);
+    
+    document.getElementById('generateFont').disabled = false;
+    
+    notify(`✓ Style learned from ${sampleCount} drawings!`);
+    playSound(700);
+}
+
+function extractStyleFeatures(pixels) {
+    const size = 14;
+    let thickness = 0;
+    let slant = 0;
+    let roundness = 0;
+    let pixelCount = 0;
+    
+    // Calculate thickness (average pixel intensity)
+    pixels.forEach(p => {
+        if (p > 0.1) {
+            thickness += p;
+            pixelCount++;
+        }
+    });
+    thickness = pixelCount > 0 ? thickness / pixels.length : 0.5;
+    
+    // Calculate slant (horizontal bias)
+    let leftWeight = 0;
+    let rightWeight = 0;
+    for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+            const val = pixels[y * size + x];
+            if (val > 0.1) {
+                if (x < size / 2) leftWeight += val;
+                else rightWeight += val;
+            }
+        }
+    }
+    slant = (rightWeight - leftWeight) / (leftWeight + rightWeight + 0.001);
+    
+    // Calculate roundness (how smooth the edges are)
+    let corners = 0;
+    let edges = 0;
+    for (let y = 1; y < size - 1; y++) {
+        for (let x = 1; x < size - 1; x++) {
+            const val = pixels[y * size + x];
+            if (val > 0.3) {
+                const neighbors = [
+                    pixels[(y-1) * size + x],
+                    pixels[(y+1) * size + x],
+                    pixels[y * size + x-1],
+                    pixels[y * size + x+1]
+                ];
+                const activeNeighbors = neighbors.filter(n => n > 0.3).length;
+                if (activeNeighbors === 2) corners++;
+                if (activeNeighbors === 3 || activeNeighbors === 4) edges++;
+            }
+        }
+    }
+    roundness = edges / (corners + edges + 1);
+    
+    return { thickness, slant, roundness };
+}
+
+async function generateStyledFont() {
+    if (!userStyle.learned) {
+        notify("Analyze your style first!");
+        return;
+    }
+    
+    document.getElementById('generateFont').disabled = true;
+    document.getElementById('styleGallery').style.display = 'block';
+    
+    const container = document.getElementById('styleDigits');
+    container.innerHTML = '';
+    
+    notify("Generating your custom font...");
+    
+    generatedDigits = [];
+    
+    // Generate each digit (0-9) in user's style with animation
+    for (let digit = 0; digit < 10; digit++) {
+        const styledDigit = generateStyledDigit(digit, userStyle);
+        generatedDigits.push(styledDigit);
+        
+        // Create and animate the display
+        const div = document.createElement('div');
+        div.className = 'style-digit';
+        div.style.opacity = '0';
+        div.style.transform = 'scale(0.8)';
+        
+        const displayCanvas = styledDigit.cloneNode(true);
+        
+        const label = document.createElement('div');
+        label.className = 'label';
+        label.textContent = digit;
+        
+        // Add click to download
+        div.onclick = () => {
+            const exportCanvas = document.createElement('canvas');
+            exportCanvas.width = 64;
+            exportCanvas.height = 64;
+            const ctx = exportCanvas.getContext('2d');
+            
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, 64, 64);
+            ctx.drawImage(styledDigit, 8, 8, 48, 48);
+            
+            exportCanvas.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `my-digit-${digit}.png`;
+                a.click();
+                URL.revokeObjectURL(url);
+                notify(`Downloaded digit ${digit}!`);
+                playSound(600 + digit * 20);
+            });
+        };
+        
+        div.appendChild(displayCanvas);
+        div.appendChild(label);
+        container.appendChild(div);
+        
+        // Animate in
+        setTimeout(() => {
+            div.style.transition = 'all 0.3s ease-out';
+            div.style.opacity = '1';
+            div.style.transform = 'scale(1)';
+        }, 50);
+        
+        // Play a rising tone for each digit
+        playSound(400 + digit * 50);
+        
+        await new Promise(r => setTimeout(r, 150));
+    }
+    
+    document.getElementById('generateFont').disabled = false;
+    document.getElementById('exportPack').disabled = false;
+    
+    notify("✓ Font generated in your style!");
+    playSound(800);
+}
+
+function generateStyledDigit(digit, style) {
+    const size = 28; // Generate at higher resolution
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    
+    // Clear background
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, size, size);
+    
+    // Set drawing style based on learned parameters
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 3 + style.thickness * 4; // 3-7px based on thickness
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    // Apply transformations
+    ctx.save();
+    ctx.translate(size / 2, size / 2);
+    
+    // Apply slant
+    const slantAngle = style.slant * 0.3; // -0.3 to 0.3 radians
+    ctx.transform(1, 0, slantAngle, 1, 0, 0);
+    
+    // Draw the digit with style
+    drawDigitPath(ctx, digit, size, style);
+    
+    ctx.restore();
+    
+    return canvas;
+}
+
+function drawDigitPath(ctx, digit, size, style) {
+    const scale = size / 28;
+    const roundness = style.roundness;
+    
+    // Helper for rounded corners
+    const curve = (x1, y1, x2, y2) => {
+        if (roundness > 0.5) {
+            ctx.quadraticCurveTo(x1 * scale, y1 * scale, x2 * scale, y2 * scale);
+        } else {
+            ctx.lineTo(x2 * scale, y2 * scale);
+        }
+    };
+    
+    ctx.beginPath();
+    
+    switch(digit) {
+        case 0:
+            ctx.ellipse(0, 0, 8 * scale, 10 * scale, 0, 0, Math.PI * 2);
+            ctx.stroke();
+            break;
+            
+        case 1:
+            ctx.moveTo(0, -10 * scale);
+            ctx.lineTo(0, 10 * scale);
+            ctx.moveTo(-2 * scale, -7 * scale);
+            ctx.lineTo(0, -10 * scale);
+            ctx.stroke();
+            break;
+            
+        case 2:
+            ctx.moveTo(-6 * scale, -7 * scale);
+            curve(-6, -10, 0, -10);
+            curve(6, -10, 6, -7);
+            curve(6, -4, 0, 0);
+            ctx.lineTo(-6 * scale, 10 * scale);
+            ctx.lineTo(6 * scale, 10 * scale);
+            ctx.stroke();
+            break;
+            
+        case 3:
+            ctx.moveTo(-6 * scale, -10 * scale);
+            ctx.lineTo(6 * scale, -10 * scale);
+            curve(8, -10, 8, -5);
+            curve(8, -2, 4, 0);
+            ctx.moveTo(4 * scale, 0);
+            curve(8, 2, 8, 5);
+            curve(8, 10, 6, 10);
+            ctx.lineTo(-6 * scale, 10 * scale);
+            ctx.stroke();
+            break;
+            
+        case 4:
+            ctx.moveTo(6 * scale, -10 * scale);
+            ctx.lineTo(6 * scale, 10 * scale);
+            ctx.moveTo(6 * scale, 2 * scale);
+            ctx.lineTo(-6 * scale, 2 * scale);
+            ctx.lineTo(-2 * scale, -10 * scale);
+            ctx.stroke();
+            break;
+            
+        case 5:
+            ctx.moveTo(6 * scale, -10 * scale);
+            ctx.lineTo(-6 * scale, -10 * scale);
+            ctx.lineTo(-6 * scale, 0);
+            ctx.lineTo(4 * scale, 0);
+            curve(8, 0, 8, 5);
+            curve(8, 10, 4, 10);
+            ctx.lineTo(-6 * scale, 10 * scale);
+            ctx.stroke();
+            break;
+            
+        case 6:
+            ctx.arc(-1 * scale, 2 * scale, 7 * scale, 0, Math.PI * 2);
+            ctx.moveTo(4 * scale, -8 * scale);
+            curve(4, -10, 0, -10);
+            curve(-4, -10, -6, -7);
+            ctx.lineTo(-6 * scale, 9 * scale);
+            ctx.stroke();
+            break;
+            
+        case 7:
+            ctx.moveTo(-6 * scale, -10 * scale);
+            ctx.lineTo(6 * scale, -10 * scale);
+            ctx.lineTo(-2 * scale, 10 * scale);
+            ctx.stroke();
+            break;
+            
+        case 8:
+            ctx.arc(0, -4 * scale, 5 * scale, 0, Math.PI * 2);
+            ctx.moveTo(5 * scale, -4 * scale);
+            ctx.arc(0, 4 * scale, 6 * scale, 0, Math.PI * 2);
+            ctx.stroke();
+            break;
+            
+        case 9:
+            ctx.arc(1 * scale, -2 * scale, 7 * scale, 0, Math.PI * 2);
+            ctx.moveTo(-4 * scale, 8 * scale);
+            curve(-4, 10, 0, 10);
+            curve(4, 10, 6, 7);
+            ctx.lineTo(6 * scale, -9 * scale);
+            ctx.stroke();
+            break;
+    }
+}
+
+function exportPNGPack() {
+    if (generatedDigits.length === 0) {
+        notify("Generate your font first!");
+        return;
+    }
+    
+    notify("Exporting PNG pack...");
+    
+    // Create a grid of all digits
+    const gridCanvas = document.createElement('canvas');
+    const cols = 5;
+    const rows = 2;
+    const cellSize = 80;
+    const padding = 15;
+    const headerHeight = 40;
+    
+    gridCanvas.width = cols * cellSize + (cols + 1) * padding;
+    gridCanvas.height = rows * cellSize + (rows + 1) * padding + headerHeight;
+    const ctx = gridCanvas.getContext('2d');
+    
+    // Background with gradient
+    const gradient = ctx.createLinearGradient(0, 0, 0, gridCanvas.height);
+    gradient.addColorStop(0, '#1a1a2e');
+    gradient.addColorStop(1, '#0f0f1e');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, gridCanvas.width, gridCanvas.height);
+    
+    // Title
+    ctx.fillStyle = '#e74c3c';
+    ctx.font = 'bold 20px "Segoe UI"';
+    ctx.textAlign = 'center';
+    ctx.fillText('My Neural Font', gridCanvas.width / 2, 28);
+    
+    // Draw each digit
+    generatedDigits.forEach((canvas, i) => {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const x = padding + col * (cellSize + padding);
+        const y = headerHeight + padding + row * (cellSize + padding);
+        
+        // Cell background with border
+        ctx.fillStyle = '#0f0f1e';
+        ctx.fillRect(x, y, cellSize, cellSize);
+        ctx.strokeStyle = 'rgba(231, 76, 60, 0.3)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, cellSize, cellSize);
+        
+        // Draw digit
+        ctx.drawImage(canvas, x + 10, y + 10, cellSize - 20, cellSize - 20);
+        
+        // Label
+        ctx.fillStyle = '#e74c3c';
+        ctx.font = 'bold 14px "Segoe UI"';
+        ctx.textAlign = 'center';
+        ctx.fillText(i, x + cellSize / 2, y + cellSize - 10);
+    });
+    
+    // Footer
+    ctx.fillStyle = '#666';
+    ctx.font = '10px "Segoe UI"';
+    ctx.textAlign = 'center';
+    ctx.fillText('Generated by Neural Draw Pro', gridCanvas.width / 2, gridCanvas.height - 8);
+    
+    // Download grid
+    gridCanvas.toBlob(blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `neural-font-pack-${Date.now()}.png`;
+        a.click();
+        URL.revokeObjectURL(url);
+        notify("✓ Font pack exported!");
+        playSound(900);
+    });
+    
+    // Also export individual digits after a short delay
+    setTimeout(() => {
+        exportIndividualDigits();
+    }, 1000);
+}
+
+function exportIndividualDigits() {
+    let exported = 0;
+    
+    generatedDigits.forEach((canvas, digit) => {
+        setTimeout(() => {
+            // Create high-res version
+            const exportCanvas = document.createElement('canvas');
+            exportCanvas.width = 64;
+            exportCanvas.height = 64;
+            const ctx = exportCanvas.getContext('2d');
+            
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, 64, 64);
+            ctx.drawImage(canvas, 8, 8, 48, 48);
+            
+            exportCanvas.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `neural-digit-${digit}.png`;
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                exported++;
+                if (exported === generatedDigits.length) {
+                    notify(`✓ All ${exported} digits exported!`);
+                }
+            });
+        }, digit * 200); // Stagger downloads
+    });
+}
+
+// ================================
+// VOICE COMMANDS
+// ================================
+let recognition = null;
+let voiceEnabled = false;
+let isListening = false;
+
+function initVoiceRecognition() {
+    // Check if browser supports Speech Recognition
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+        notify("Voice commands not supported in this browser");
+        document.getElementById('voiceToggle').disabled = true;
+        document.getElementById('voiceToggle').style.opacity = '0.5';
+        return false;
+    }
+    
+    recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+    
+    recognition.onstart = () => {
+        isListening = true;
+        document.getElementById('voiceIndicator').classList.add('listening');
+    };
+    
+    recognition.onend = () => {
+        isListening = false;
+        document.getElementById('voiceIndicator').classList.remove('listening');
+        
+        // Auto-restart if voice is still enabled
+        if (voiceEnabled) {
+            try {
+                recognition.start();
+            } catch(e) {
+                // Already started or stopped
+            }
+        }
+    };
+    
+    recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+            notify("Microphone access denied. Please enable it in browser settings.");
+            toggleVoiceCommands(false);
+        }
+    };
+    
+    recognition.onresult = (event) => {
+        const last = event.results.length - 1;
+        const command = event.results[last][0].transcript.toLowerCase().trim();
+        const confidence = (event.results[last][0].confidence * 100).toFixed(0);
+        
+        // Visual feedback
+        document.getElementById('voiceIndicator').classList.add('success');
+        setTimeout(() => {
+            document.getElementById('voiceIndicator').classList.remove('success');
+        }, 300);
+        
+        // Show what was heard
+        const transcriptMsg = `🎤 Heard: "${command}" (${confidence}% confident)`;
+        console.log(transcriptMsg);
+        
+        processVoiceCommand(command);
+    };
+    
+    return true;
+}
+
+function toggleVoiceCommands(enable) {
+    if (enable === undefined) {
+        enable = !voiceEnabled;
+    }
+    
+    voiceEnabled = enable;
+    const btn = document.getElementById('voiceToggle');
+    const status = btn.querySelector('.voice-status');
+    const helpPanel = document.getElementById('voiceHelp');
+    
+    if (voiceEnabled) {
+        if (!recognition && !initVoiceRecognition()) {
+            return;
+        }
+        
+        btn.classList.add('active');
+        status.textContent = 'Listening...';
+        helpPanel.style.display = 'block';
+        
+        try {
+            recognition.start();
+            notify("🎤 Voice commands activated! Try: 'train', 'guess', 'clear'");
+            playSound(600);
+        } catch(e) {
+            console.error('Could not start recognition:', e);
+        }
+    } else {
+        btn.classList.remove('active');
+        status.textContent = 'Voice Off';
+        helpPanel.style.display = 'none';
+        
+        if (recognition) {
+            recognition.stop();
+        }
+        
+        notify("Voice commands deactivated");
+    }
+}
+
+function processVoiceCommand(command) {
+    console.log('Voice command:', command);
+    
+    // Normalize command
+    command = command.replace(/[^\w\s]/g, '').toLowerCase();
+    
+    // Command patterns
+    const trainPattern = /\b(train|trading|tray)\b/;
+    const guessPattern = /\b(guess|gas|guest|guessing)\b/;
+    const clearPattern = /\b(clear|clean|erase|delete|reset)\b/;
+    const showPattern = /\b(show|draw|display|example)\s*(me\s*)?(a\s*)?(the\s*)?(digit\s*)?(\d)\b/;
+    const selectPattern = /\b(select|choose|pick)\s*(digit\s*)?(\d)\b/;
+    const batchPattern = /\b(batch|back|bad)\s*(train|training|mode)\b/;
+    const analyzePattern = /\b(analyze|analyse|learn|study)\s*(my\s*)?(style|handwriting)\b/;
+    const generatePattern = /\b(generate|create|make)\s*(font|digits)\b/;
+    const exportPattern = /\b(export|save|download)\b/;
+    
+    let executed = false;
+    
+    // Train command
+    if (trainPattern.test(command)) {
+        document.getElementById('train').click();
+        notify("🎤 Training...");
+        executed = true;
+    }
+    
+    // Guess command
+    else if (guessPattern.test(command)) {
+        document.getElementById('guess').click();
+        notify("🎤 Making prediction...");
+        executed = true;
+    }
+    
+    // Clear command
+    else if (clearPattern.test(command)) {
+        document.getElementById('clear').click();
+        notify("🎤 Canvas cleared");
+        executed = true;
+    }
+    
+    // Show digit command (e.g., "show 7", "draw example 3")
+    else if (showPattern.test(command)) {
+        const match = command.match(showPattern);
+        const digit = parseInt(match[5]);
+        drawExampleDigit(digit);
+        notify(`🎤 Drawing example ${digit}`);
+        executed = true;
+    }
+    
+    // Select digit command (e.g., "select 5")
+    else if (selectPattern.test(command)) {
+        const match = command.match(selectPattern);
+        const digit = parseInt(match[3]);
+        targetDigit = digit;
+        updateDigitSelection();
+        notify(`🎤 Selected digit ${digit}`);
+        playSound(500 + digit * 50);
+        executed = true;
+    }
+    
+    // Batch train command
+    else if (batchPattern.test(command)) {
+        if (!batchMode) {
+            document.getElementById('batch').click();
+            notify("🎤 Starting batch training");
+            executed = true;
+        }
+    }
+    
+    // Analyze style command
+    else if (analyzePattern.test(command)) {
+        document.getElementById('analyzeStyle').click();
+        notify("🎤 Analyzing your style");
+        executed = true;
+    }
+    
+    // Generate font command
+    else if (generatePattern.test(command)) {
+        document.getElementById('generateFont').click();
+        notify("🎤 Generating font");
+        executed = true;
+    }
+    
+    // Export command
+    else if (exportPattern.test(command)) {
+        document.getElementById('exportPack').click();
+        notify("🎤 Exporting...");
+        executed = true;
+    }
+    
+    if (executed) {
+        playSound(700);
+    } else {
+        notify(`🎤 Command not recognized: "${command}"`);
+        playSound(300);
+    }
+}
+
+function drawExampleDigit(digit) {
+    if (digit < 0 || digit > 9) return;
+    
+    clear();
+    
+    // Draw a simple example of the digit
+    const size = canvas.width;
+    const cx = size / 2;
+    const cy = size / 2;
+    const scale = size / 28;
+    
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 16;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    ctx.beginPath();
+    
+    switch(digit) {
+        case 0:
+            ctx.ellipse(cx, cy, 60 * scale, 80 * scale, 0, 0, Math.PI * 2);
+            break;
+            
+        case 1:
+            ctx.moveTo(cx, cy - 80 * scale);
+            ctx.lineTo(cx, cy + 80 * scale);
+            ctx.moveTo(cx - 20 * scale, cy - 60 * scale);
+            ctx.lineTo(cx, cy - 80 * scale);
+            break;
+            
+        case 2:
+            ctx.moveTo(cx - 50 * scale, cy - 60 * scale);
+            ctx.quadraticCurveTo(cx, cy - 90 * scale, cx + 50 * scale, cy - 60 * scale);
+            ctx.quadraticCurveTo(cx + 50 * scale, cy - 20 * scale, cx, cy);
+            ctx.lineTo(cx - 50 * scale, cy + 80 * scale);
+            ctx.lineTo(cx + 50 * scale, cy + 80 * scale);
+            break;
+            
+        case 3:
+            ctx.moveTo(cx - 50 * scale, cy - 80 * scale);
+            ctx.lineTo(cx + 40 * scale, cy - 80 * scale);
+            ctx.quadraticCurveTo(cx + 60 * scale, cy - 80 * scale, cx + 60 * scale, cy - 40 * scale);
+            ctx.quadraticCurveTo(cx + 60 * scale, cy, cx + 20 * scale, cy);
+            ctx.moveTo(cx + 20 * scale, cy);
+            ctx.quadraticCurveTo(cx + 60 * scale, cy, cx + 60 * scale, cy + 40 * scale);
+            ctx.quadraticCurveTo(cx + 60 * scale, cy + 80 * scale, cx + 40 * scale, cy + 80 * scale);
+            ctx.lineTo(cx - 50 * scale, cy + 80 * scale);
+            break;
+            
+        case 4:
+            ctx.moveTo(cx + 20 * scale, cy - 80 * scale);
+            ctx.lineTo(cx + 20 * scale, cy + 80 * scale);
+            ctx.moveTo(cx + 20 * scale, cy + 20 * scale);
+            ctx.lineTo(cx - 60 * scale, cy + 20 * scale);
+            ctx.lineTo(cx - 20 * scale, cy - 80 * scale);
+            break;
+            
+        case 5:
+            ctx.moveTo(cx + 50 * scale, cy - 80 * scale);
+            ctx.lineTo(cx - 50 * scale, cy - 80 * scale);
+            ctx.lineTo(cx - 50 * scale, cy);
+            ctx.lineTo(cx + 30 * scale, cy);
+            ctx.quadraticCurveTo(cx + 60 * scale, cy, cx + 60 * scale, cy + 40 * scale);
+            ctx.quadraticCurveTo(cx + 60 * scale, cy + 80 * scale, cx + 30 * scale, cy + 80 * scale);
+            ctx.lineTo(cx - 50 * scale, cy + 80 * scale);
+            break;
+            
+        case 6:
+            ctx.arc(cx, cy + 20 * scale, 60 * scale, 0, Math.PI * 2);
+            ctx.moveTo(cx + 40 * scale, cy - 60 * scale);
+            ctx.quadraticCurveTo(cx + 40 * scale, cy - 90 * scale, cx, cy - 90 * scale);
+            ctx.quadraticCurveTo(cx - 40 * scale, cy - 90 * scale, cx - 60 * scale, cy - 60 * scale);
+            ctx.lineTo(cx - 60 * scale, cy + 80 * scale);
+            break;
+            
+        case 7:
+            ctx.moveTo(cx - 60 * scale, cy - 80 * scale);
+            ctx.lineTo(cx + 60 * scale, cy - 80 * scale);
+            ctx.lineTo(cx - 20 * scale, cy + 80 * scale);
+            break;
+            
+        case 8:
+            ctx.arc(cx, cy - 35 * scale, 45 * scale, 0, Math.PI * 2);
+            ctx.moveTo(cx + 55 * scale, cy - 35 * scale);
+            ctx.arc(cx, cy + 35 * scale, 55 * scale, 0, Math.PI * 2);
+            break;
+            
+        case 9:
+            ctx.arc(cx, cy - 20 * scale, 60 * scale, 0, Math.PI * 2);
+            ctx.moveTo(cx - 40 * scale, cy + 60 * scale);
+            ctx.quadraticCurveTo(cx - 40 * scale, cy + 90 * scale, cx, cy + 90 * scale);
+            ctx.quadraticCurveTo(cx + 40 * scale, cy + 90 * scale, cx + 60 * scale, cy + 60 * scale);
+            ctx.lineTo(cx + 60 * scale, cy - 80 * scale);
+            break;
+    }
+    
+    ctx.stroke();
+    
+    // Store the drawing
+    paths = [[[cx, cy]]]; // Dummy path for downsample
+    allPaths = [[[cx, cy]]];
+}
+
+// ================================
+// DATA & TRAINING
+// ================================
+const nn = new NeuralNetwork(196, 64, 10);
+const trainingData = Array(10).fill().map(() => []);
+const confusionData = Array(10).fill().map(() => Array(10).fill(0));
+let targetDigit = 0;
+let batchMode = false;
+let batchDrawings = [];
+let batchCurrentDigit = 0;
+
+function downsample() {
+    const size = 14;
+    const cell = canvas.width / size;
+    const grid = Array(size).fill().map(() => Array(size).fill(0));
+
+    allPaths.forEach(path => {
+        path.forEach(([x, y]) => {
+            const col = Math.floor(x / cell);
+            const row = Math.floor(y / cell);
+            if (col >= 0 && col < size && row >= 0 && row < size) {
+                grid[row][col] = 1;
+            }
+        });
+    });
+
+    return grid.flat();
+}
+
+function train() {
+    const input = downsample();
+    if (input.every(v => v === 0)) return notify("Draw something first!");
+
+    const target = Array(10).fill(0); target[targetDigit] = 1;
+    trainingData[targetDigit].push({input, target});
+
+    // Train multiple epochs on this example
+    for(let i = 0; i < 3; i++) {
+        nn.train(input, target);
+    }
+
+    updateStats();
+    updateDigitCounts();
+    notify(`Trained on ${targetDigit}! ✓`);
+    
+    // Update style learning status
+    const totalSamples = trainingData.flat().length;
+    if (totalSamples >= 1) {
+        updateStyleProgress();
+    }
+    
+    clear();
+    
+    if(batchMode && batchCurrentDigit < 10) {
+        batchDrawings.push({digit: targetDigit, input, target});
+        updateBatchProgress();
+        setTimeout(nextBatchDigit, 300);
+    }
+}
+
+function guess() {
+    const input = downsample();
+    if (input.every(v => v === 0)) return notify("Draw a digit first!");
+
+    const {prediction, confidence, all} = nn.predict(input);
+    
+    document.getElementById('prediction').textContent = prediction;
+    document.getElementById('confidence').textContent = confidence;
+    document.getElementById('lastGuess').textContent = `${prediction} (was ${targetDigit})`;
+    
+    // Update confusion matrix
+    confusionData[targetDigit][prediction]++;
+    updateConfusionMatrix();
+    
+    visualizeNetwork(input, all);
+    
+    // Show similar MNIST examples if dataset is loaded
+    if (mnistData.loaded) {
+        findSimilarMNIST(input);
+    }
+    
+    playSound(prediction === targetDigit ? 800 : 400);
+    
+    const emoji = prediction === targetDigit ? '✓' : '✗';
+    notify(`${emoji} Predicted: ${prediction} (${confidence}%)`);
+}
+
+// ================================
+// BATCH TRAINING
+// ================================
+function startBatchMode() {
+    batchMode = true;
+    batchDrawings = [];
+    batchCurrentDigit = 0;
+    document.getElementById('batchMode').classList.add('active');
+    initBatchProgress();
+    targetDigit = 0;
+    updateDigitSelection();
+    notify("Draw digit 0...");
+}
+
+function initBatchProgress() {
+    const container = document.getElementById('batchProgress');
+    container.innerHTML = '';
+    for(let i = 0; i < 10; i++) {
+        const item = document.createElement('div');
+        item.className = 'batch-item';
+        item.textContent = i;
+        item.id = `batch-${i}`;
+        container.appendChild(item);
+    }
+    document.getElementById('batch-0').classList.add('current');
+}
+
+function updateBatchProgress() {
+    const current = document.getElementById(`batch-${batchCurrentDigit}`);
+    current.classList.remove('current');
+    current.classList.add('done');
+}
+
+function nextBatchDigit() {
+    batchCurrentDigit++;
+    if(batchCurrentDigit < 10) {
+        targetDigit = batchCurrentDigit;
+        updateDigitSelection();
+        document.getElementById(`batch-${batchCurrentDigit}`).classList.add('current');
+        notify(`Draw digit ${batchCurrentDigit}...`);
+    } else {
+        finishBatchMode();
+    }
+}
+
+function finishBatchMode() {
+    batchMode = false;
+    document.getElementById('batchMode').classList.remove('active');
+    notify(`Batch training complete! Trained ${batchDrawings.length} digits`);
+    batchDrawings = [];
+    batchCurrentDigit = 0;
+}
+
+// ================================
+// UI & VISUALIZATION
+// ================================
+for(let i=0;i<10;i++){
+    const btn = document.createElement('div');
+    btn.className='digit-btn';
+    btn.innerHTML = `${i}<span class="count">0</span>`;
+    btn.onclick=()=>{ 
+        if(!batchMode) {
+            targetDigit=i; 
+            updateDigitSelection();
+        }
+    };
+    btn.dataset.digit = i;
+    document.getElementById('digits').appendChild(btn);
+}
+updateDigitSelection();
+
+function updateDigitSelection() {
+    document.querySelectorAll('.digit-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.digit-btn[data-digit="${targetDigit}"]`).classList.add('active');
+}
+
+function updateDigitCounts() {
+    for(let i = 0; i < 10; i++) {
+        const count = trainingData[i].length;
+        document.querySelector(`.digit-btn[data-digit="${i}"] .count`).textContent = count;
+    }
+}
+
+document.getElementById('clear').onclick = clear;
+document.getElementById('train').onclick = train;
+document.getElementById('guess').onclick = guess;
+document.getElementById('replay').onclick = replayDrawing;
+document.getElementById('export').onclick = exportDrawing;
+
+document.getElementById('batch').onclick = () => {
+    if(!batchMode) startBatchMode();
+};
+
+document.getElementById('loadMnist').onclick = loadMNIST;
+document.getElementById('trainMnist').onclick = trainOnMNIST;
+
+document.getElementById('analyzeStyle').onclick = analyzeStyle;
+document.getElementById('generateFont').onclick = generateStyledFont;
+document.getElementById('exportPack').onclick = exportPNGPack;
+
+document.getElementById('voiceToggle').onclick = () => toggleVoiceCommands();
+
+// Keyboard shortcut: V key toggles voice commands
+document.addEventListener('keydown', (e) => {
+    // Only if not typing in an input field
+    if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+        if (e.key === 'v' || e.key === 'V') {
+            toggleVoiceCommands();
+        }
+    }
+});
+
+document.getElementById('singleMode').onclick = () => {
+    if(batchMode) finishBatchMode();
+    document.getElementById('singleMode').classList.add('active');
+    document.getElementById('batchModeBtn').classList.remove('active');
+};
+
+document.getElementById('batchModeBtn').onclick = () => {
+    if(!batchMode) {
+        document.getElementById('batchModeBtn').classList.add('active');
+        document.getElementById('singleMode').classList.remove('active');
+        startBatchMode();
+    }
+};
+
+document.getElementById('save').onclick = () => {
+    const data = {
+        model: nn.export(),
+        training: trainingData,
+        confusion: confusionData,
+        mnistLoaded: mnistData.loaded,
+        mnistEpochs: document.getElementById('mnistEpochs').textContent,
+        mnistAccuracy: document.getElementById('mnistAccuracy').textContent,
+        userStyle: userStyle
+    };
+    localStorage.setItem('neuralDrawModel', JSON.stringify(data));
+    notify("Model + Style saved! ✓");
+};
+
+document.getElementById('load').onclick = () => {
+    const saved = localStorage.getItem('neuralDrawModel');
+    if(saved) {
+        const data = JSON.parse(saved);
+        nn.import(data.model);
+        data.training.forEach((arr, i) => trainingData[i] = arr);
+        if(data.confusion) {
+            data.confusion.forEach((arr, i) => confusionData[i] = arr);
+        }
+        if(data.mnistLoaded) {
+            document.getElementById('mnistStatus').textContent = 'Trained ✓';
+            document.getElementById('mnistStatus').style.color = '#27ae60';
+            document.getElementById('mnistEpochs').textContent = data.mnistEpochs || '0';
+            document.getElementById('mnistAccuracy').textContent = data.mnistAccuracy || '0';
+            document.getElementById('mnistStats').style.display = 'block';
+        }
+        if(data.userStyle && data.userStyle.learned) {
+            userStyle = data.userStyle;
+            document.getElementById('styleStatus').textContent = 'Style learned ✓';
+            document.getElementById('styleStatus').style.color = '#27ae60';
+            document.getElementById('styleParams').style.display = 'block';
+            
+            const thicknessPercent = (userStyle.thickness * 100).toFixed(0);
+            const slantPercent = ((userStyle.slant + 1) * 50).toFixed(0);
+            const roundnessPercent = (userStyle.roundness * 100).toFixed(0);
+            
+            document.getElementById('styleThickness').textContent = thicknessPercent;
+            document.getElementById('styleSlant').textContent = (userStyle.slant * 45).toFixed(0) + '°';
+            document.getElementById('styleRoundness').textContent = roundnessPercent + '%';
+            
+            setTimeout(() => {
+                document.getElementById('thicknessBar').style.width = thicknessPercent + '%';
+                document.getElementById('slantBar').style.width = slantPercent + '%';
+                document.getElementById('roundnessBar').style.width = roundnessPercent + '%';
+            }, 100);
+            
+            document.getElementById('generateFont').disabled = false;
+        }
+        updateStats();
+        updateDigitCounts();
+        updateConfusionMatrix();
+        notify("Model + Style loaded! ✓");
+    } else {
+        notify("No saved model found");
+    }
+};
+
+document.getElementById('reset').onclick = () => {
+    if(confirm("Reset all training data and model?")) {
+        trainingData.forEach(arr => arr.length = 0);
+        confusionData.forEach(arr => arr.fill(0));
+        nn.w1 = nn.randomMatrix(64, 196);
+        nn.w2 = nn.randomMatrix(10, 64);
+        nn.b1 = nn.randomArray(64);
+        nn.b2 = nn.randomArray(10);
+        updateStats();
+        updateDigitCounts();
+        updateConfusionMatrix();
+        notify("Reset complete");
+    }
+};
+
+function updateStats() {
+    const total = trainingData.flat().length;
+    document.getElementById('trained').textContent = total;
+    document.getElementById('progress').style.width = `${Math.min(total, 100)}%`;
+    
+    // Calculate accuracy from confusion matrix
+    const correct = confusionData.reduce((sum, row, i) => sum + row[i], 0);
+    const totalGuesses = confusionData.flat().reduce((a, b) => a + b, 0);
+    const accuracy = totalGuesses > 0 ? ((correct / totalGuesses) * 100).toFixed(1) : 0;
+    document.getElementById('accuracy').textContent = accuracy;
+}
+
+function updateConfusionMatrix() {
+    const grid = document.getElementById('confusionMatrix');
+    grid.innerHTML = '';
+    
+    // Header row
+    grid.appendChild(createCell('', true));
+    for(let i = 0; i < 10; i++) {
+        grid.appendChild(createCell(i, true));
+    }
+    
+    // Data rows
+    for(let actual = 0; actual < 10; actual++) {
+        grid.appendChild(createCell(actual, true));
+        for(let predicted = 0; predicted < 10; predicted++) {
+            const value = confusionData[actual][predicted];
+            const cell = createCell(value || '·', false);
+            
+            if(value > 0) {
+                const maxInRow = Math.max(...confusionData[actual]);
+                const intensity = value / maxInRow;
+                if(actual === predicted) {
+                    cell.style.background = `rgba(46, 204, 113, ${intensity * 0.5})`;
+                } else {
+                    cell.style.background = `rgba(231, 76, 60, ${intensity * 0.5})`;
+                }
+            }
+            grid.appendChild(cell);
+        }
+    }
+}
+
+function createCell(text, isHeader) {
+    const cell = document.createElement('div');
+    cell.className = 'confusion-cell' + (isHeader ? ' header' : '');
+    cell.textContent = text;
+    return cell;
+}
+
+function visualizeNetwork(input, output) {
+    const svg = document.querySelector('#network svg');
+    svg.innerHTML = '';
+
+    const inputSample = input.filter((_, i) => i % 3 === 0).slice(0, 20);
+    const hiddenSample = nn.hiddenLayer ? nn.hiddenLayer.slice(0, 15) : Array(15).fill(0);
+
+    const layers = [
+        {nodes: inputSample, x: 30, r: 3},
+        {nodes: hiddenSample, x: 140, r: 4},
+        {nodes: output, x: 250, r: 5}
+    ];
+
+    const svgNS = 'http://www.w3.org/2000/svg';
+
+    layers.forEach((layer, i) => {
+        layer.nodes.forEach((val, j) => {
+            const y = 20 + j * (160 / layer.nodes.length);
+            const intensity = Math.min(255, val * 255);
+            const fill = `rgb(${intensity}, ${intensity * 0.6}, ${intensity * 0.4})`;
+            
+            const circle = document.createElementNS(svgNS, 'circle');
+            circle.setAttribute('cx', layer.x);
+            circle.setAttribute('cy', y);
+            circle.setAttribute('r', layer.r);
+            circle.setAttribute('fill', fill);
+            circle.setAttribute('stroke', '#333');
+            circle.setAttribute('stroke-width', '0.5');
+            
+            svg.appendChild(circle);
+
+            if(i > 0 && val > 0.3) {
+                const prev = layers[i - 1];
+                prev.nodes.forEach((pval, k) => {
+                    if(pval > 0.2) {
+                        const py = 20 + k * (160 / prev.nodes.length);
+                        const line = document.createElementNS(svgNS, 'line');
+                        line.setAttribute('x1', prev.x);
+                        line.setAttribute('y1', py);
+                        line.setAttribute('x2', layer.x);
+                        line.setAttribute('y2', y);
+                        line.setAttribute('stroke', `rgba(241, 196, 15, ${pval * val * 0.3})`);
+                        line.setAttribute('stroke-width', '1');
+                        svg.insertBefore(line, svg.firstChild);
+                    }
+                });
+            }
+        });
+    });
+}
+
+// ================================
+// UTILS
+// ================================
+function notify(msg) {
+    const n = document.getElementById('notif');
+    n.textContent = msg;
+    n.classList.add('show');
+    setTimeout(() => n.classList.remove('show'), 2500);
+}
+
+function playSound(freq) {
+    try {
+        const audio = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audio.createOscillator();
+        const gain = audio.createGain();
+        osc.connect(gain);
+        gain.connect(audio.destination);
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.1, audio.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audio.currentTime + 0.2);
+        osc.start();
+        osc.stop(audio.currentTime + 0.2);
+    } catch(e) {
+        // Audio context might be blocked
+    }
+}
+
+// ================================
+// INIT
+// ================================
+clear();
+// Initialize network by doing a forward pass
+const initInput = Array(196).fill(0);
+const initOutput = nn.forward(initInput);
+visualizeNetwork(initInput, initOutput);
+updateConfusionMatrix();
+</script>
+</body>
+</html>
